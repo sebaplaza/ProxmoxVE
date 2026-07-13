@@ -29,10 +29,6 @@ chmod +x /opt/stalwart-mail/stalwart
 touch "/opt/stalwart-mail/stalwart-${RELEASE}"
 msg_ok "Installed Stalwart Mail ${RELEASE}"
 
-msg_info "Initializing Stalwart Mail"
-/opt/stalwart-mail/stalwart --init /opt/stalwart-mail &>/dev/null || true
-msg_ok "Initialized Stalwart Mail"
-
 msg_info "Creating Service"
 cat <<EOF >/etc/systemd/system/stalwart-mail.service
 [Unit]
@@ -42,7 +38,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-ExecStart=/opt/stalwart-mail/stalwart --config /opt/stalwart-mail/etc/config.toml
+ExecStart=/opt/stalwart-mail/stalwart
 Restart=on-failure
 RestartSec=5
 
@@ -51,6 +47,15 @@ WantedBy=multi-user.target
 EOF
 systemctl enable -q --now stalwart-mail
 msg_ok "Created Service"
+
+# Bootstrap admin credentials are printed once to the journal on first start.
+# Retrieve them so the user can complete setup via the web UI.
+sleep 2
+BOOTSTRAP_PASS=$(journalctl -u stalwart-mail --no-pager -n 50 2>/dev/null \
+  | grep -oP '(?<=password: )\S+' | head -1)
+if [[ -n "$BOOTSTRAP_PASS" ]]; then
+  msg_ok "Bootstrap credentials: admin / ${BOOTSTRAP_PASS}"
+fi
 
 motd_ssh
 customize
